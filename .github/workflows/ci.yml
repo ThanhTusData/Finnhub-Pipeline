@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  pull_request:
+    branches: ["main", "develop", "**"]
+  push:
+    branches: ["develop", "feature/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies (packages + dev tools)
+        run: |
+          # install runtime deps for both services (if exist)
+          if [ -f finnhub_producer/requirements.txt ]; then pip install -r finnhub_producer/requirements.txt; fi
+          if [ -f spark_processor/requirements.txt ]; then pip install -r spark_processor/requirements.txt; fi
+          # install dev tools used by CI
+          pip install black==23.12.0 flake8==6.1.0 isort==5.12.0 pytest==7.4.0
+
+      - name: Run flake8
+        run: |
+          echo "Running flake8..."
+          flake8 . --max-line-length=120 || true
+
+      - name: Run isort check
+        run: |
+          isort --check-only --recursive . || true
+
+      - name: Run black check
+        run: |
+          black --check .
+
+      - name: Run unit tests (pytest)
+        run: |
+          pytest -q --maxfail=1
+
+      # Optional: integration test with docker-compose
+      # Uncomment and provide docker-compose.test.yml if you want to run integration tests in CI.
+      # - name: Start integration services
+      #   run: |
+      #     docker-compose -f docker-compose.test.yml up -d --build
+      # - name: Wait for services
+      #   run: ./scripts/wait_for_services.sh kafka cassandra 60
+      # - name: Run integration tests
+      #   run: pytest tests/integration -q
+      # - name: Tear down integration services
+      #   if: always()
+      #   run: docker-compose -f docker-compose.test.yml down -v

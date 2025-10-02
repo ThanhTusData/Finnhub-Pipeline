@@ -1,0 +1,28 @@
+groups:
+  - name: example.rules
+    rules:
+      - alert: FinnhubProducerErrorsHigh
+        expr: rate(finnhub_produce_errors_total[2m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Finnhub producer producing errors"
+          description: "Producer has >0 errors per second over the last 2 minutes."
+
+      - alert: FinnhubProducerStopped
+        expr: increase(finnhub_produced_total[5m]) == 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Finnhub producer produced nothing in 10m"
+          description: "No messages produced in 10 minutes - check producer status."
+
+      - alert: PrometheusDown
+        expr: up{job="prometheus"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prometheus is down"

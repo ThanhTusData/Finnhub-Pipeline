@@ -1,0 +1,3 @@
+rules:
+  - pattern: 'kafka.server<type=(.+), name=(.+)><>Value'
+    name: kafka_$1_$2
