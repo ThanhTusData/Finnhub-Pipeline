@@ -1,0 +1,7 @@
+- job_name: 'kafka'
+  static_configs:
+    - targets:
+        - 'kafka:9090'
+      labels:
+        service: 'kafka'
+        component: 'broker'

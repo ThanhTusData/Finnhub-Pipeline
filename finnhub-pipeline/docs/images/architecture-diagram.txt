@@ -1,0 +1,137 @@
+# Architecture Diagram
+
+# Since we cannot create actual PNG files, here's an ASCII diagram and instructions to create the image:
+
+## ASCII Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                           FINNHUB TRADING PIPELINE                       │
+└─────────────────────────────────────────────────────────────────────────┘
+
+                            ┌──────────────┐
+                            │  Finnhub API │
+                            │  (WebSocket) │
+                            └──────┬───────┘
+                                   │
+                                   │ Real-time Trades
+                                   ▼
+                    ┌──────────────────────────┐
+                    │   Finnhub Producer       │
+                    │   • WebSocket Client     │
+                    │   • Data Validation      │
+                    │   • Metrics Export       │
+                    └──────────┬───────────────┘
+                               │
+                               │ Kafka Producer
+                               ▼
+        ┌──────────────────────────────────────────┐
+        │            Kafka Cluster                 │
+        │  Topic: stock-trades                     │
+        │  Partitions: 3, Replication: 3           │
+        └────┬────────────────────────┬────────────┘
+             │                        │
+             │ Stream                 │ Monitoring
+             ▼                        ▼
+    ┌─────────────────┐      ┌────────────────┐
+    │ Spark Streaming │      │   Prometheus   │
+    │ • Parse JSON    │      │   • Scraping   │
+    │ • Transform     │      │   • Alerting   │
+    │ • Aggregate     │      └────────┬───────┘
+    └────┬──────┬─────┘               │
+         │      │                     ▼
+         │      │              ┌──────────────┐
+         │      │              │ Alertmanager │
+         │      │              └──────┬───────┘
+         │      │                     │
+         │      │              ┌──────▼───────┐
+         │      │              │    Slack     │
+         │      │              └──────────────┘
+         ▼      ▼
+    ┌──────────────────────┐
+    │   Cassandra Cluster  │
+    │   • trades_v2        │
+    │   • trade_aggregates │
+    └──────────┬───────────┘
+               │
+               │ Query
+               ▼
+         ┌──────────┐
+         │ Grafana  │
+         │Dashboard │
+         └──────────┘
+
+Legend:
+─── : Data Flow
+··· : Metrics/Monitoring
+```
+
+## To Create Actual Diagram:
+
+### Option 1: Using draw.io
+1. Go to https://app.diagrams.net/
+2. Create boxes for each component
+3. Add arrows showing data flow
+4. Use these colors:
+   - Blue: Data ingestion layer
+   - Green: Processing layer
+   - Orange: Storage layer
+   - Purple: Monitoring layer
+
+### Option 2: Using Mermaid (GitHub supports this)
+Create a file `architecture.mmd`:
+
+```mermaid
+graph TB
+    A[Finnhub API] -->|WebSocket| B[Finnhub Producer]
+    B -->|Kafka Producer| C[Kafka Topic]
+    C -->|Stream| D[Spark Streaming]
+    D -->|Write| E[Cassandra]
+    E -->|Query| F[Grafana]
+    
+    B -.->|Metrics| G[Prometheus]
+    D -.->|Metrics| G
+    E -.->|Metrics| G
+    G -.->|Alerts| H[Alertmanager]
+    H -.->|Notify| I[Slack]
+    
+    style A fill:#e1f5ff
+    style B fill:#b3e5fc
+    style C fill:#81d4fa
+    style D fill:#4fc3f7
+    style E fill:#29b6f6
+    style F fill:#03a9f4
+    style G fill:#fce4ec
+    style H fill:#f8bbd0
+    style I fill:#f48fb1
+```
+
+### Option 3: Using Python + Graphviz
+```python
+from graphviz import Digraph
+
+dot = Digraph(comment='Trading Pipeline Architecture')
+dot.attr(rankdir='TB')
+
+# Nodes
+dot.node('A', 'Finnhub API', shape='box', style='filled', fillcolor='lightblue')
+dot.node('B', 'Producer', shape='box', style='filled', fillcolor='lightgreen')
+dot.node('C', 'Kafka', shape='cylinder', style='filled', fillcolor='yellow')
+dot.node('D', 'Spark', shape='box', style='filled', fillcolor='orange')
+dot.node('E', 'Cassandra', shape='cylinder', style='filled', fillcolor='pink')
+dot.node('F', 'Grafana', shape='box', style='filled', fillcolor='purple')
+
+# Edges
+dot.edge('A', 'B', label='WebSocket')
+dot.edge('B', 'C', label='Produce')
+dot.edge('C', 'D', label='Consume')
+dot.edge('D', 'E', label='Write')
+dot.edge('E', 'F', label='Query')
+
+dot.render('architecture-diagram', format='png')
+```
+
+### Option 4: Using Lucidchart
+1. Sign up at https://www.lucidchart.com/
+2. Use AWS/Cloud architecture templates
+3. Export as PNG

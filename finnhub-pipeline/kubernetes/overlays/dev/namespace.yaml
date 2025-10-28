@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: trading-pipeline-dev
+  labels:
+    name: trading-pipeline-dev
+    environment: development
+    app: finnhub-pipeline
+  annotations:
+    description: "Development environment for trading pipeline"
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: dev-quota
+  namespace: trading-pipeline-dev
+spec:
+  hard:
+    requests.cpu: "10"
+    requests.memory: 20Gi
+    limits.cpu: "20"
+    limits.memory: 40Gi
+    persistentvolumeclaims: "10"
+    services.loadbalancers: "1"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: dev-limits
+  namespace: trading-pipeline-dev
+spec:
+  limits:
+  - max:
+      cpu: "4"
+      memory: 8Gi
+    min:
+      cpu: "100m"
+      memory: 128Mi
+    default:
+      cpu: "500m"
+      memory: 512Mi
+    defaultRequest:
+      cpu: "250m"
+      memory: 256Mi
+    type: Container

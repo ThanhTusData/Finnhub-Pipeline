@@ -1,0 +1,31 @@
+# Development Override for Docker Compose
+
+version: '3.8'
+
+services:
+  finnhub-producer:
+    environment:
+      LOG_LEVEL: DEBUG
+      SYMBOLS: AAPL,GOOGL  # Fewer symbols for dev
+    volumes:
+      - ./finnhub_producer/src:/app/src:ro
+
+  spark-processor:
+    environment:
+      SPARK_DRIVER_MEMORY: 1g
+      SPARK_EXECUTOR_MEMORY: 1g
+    volumes:
+      - ./spark_processor/src:/app/src:ro
+
+  kafka:
+    environment:
+      KAFKA_LOG_RETENTION_HOURS: 24  # Shorter retention for dev
+
+  cassandra:
+    environment:
+      MAX_HEAP_SIZE: 2G
+      HEAP_NEWSIZE: 400M
+
+  grafana:
+    environment:
+      GF_LOG_LEVEL: debug

@@ -1,0 +1,83 @@
+{
+  "type": "record",
+  "name": "MarketValue",
+  "namespace": "com.trading.finnhub.v2",
+  "doc": "Enhanced stock market trade data (v2) with additional fields",
+  "fields": [
+    {
+      "name": "symbol",
+      "type": "string",
+      "doc": "Stock symbol (e.g., AAPL, GOOGL)"
+    },
+    {
+      "name": "price",
+      "type": "double",
+      "doc": "Trade price in USD"
+    },
+    {
+      "name": "timestamp",
+      "type": "long",
+      "doc": "Trade timestamp in milliseconds since epoch",
+      "logicalType": "timestamp-millis"
+    },
+    {
+      "name": "volume",
+      "type": "double",
+      "doc": "Trade volume (number of shares)"
+    },
+    {
+      "name": "conditions",
+      "type": {
+        "type": "array",
+        "items": "string"
+      },
+      "default": [],
+      "doc": "Trade condition codes"
+    },
+    {
+      "name": "processed_at",
+      "type": "long",
+      "doc": "Processing timestamp in milliseconds",
+      "logicalType": "timestamp-millis"
+    },
+    {
+      "name": "exchange",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Exchange code (e.g., NASDAQ, NYSE)"
+    },
+    {
+      "name": "trade_id",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Unique trade identifier"
+    },
+    {
+      "name": "bid_price",
+      "type": ["null", "double"],
+      "default": null,
+      "doc": "Best bid price at time of trade"
+    },
+    {
+      "name": "ask_price",
+      "type": ["null", "double"],
+      "default": null,
+      "doc": "Best ask price at time of trade"
+    },
+    {
+      "name": "is_market_hours",
+      "type": "boolean",
+      "default": false,
+      "doc": "Whether trade occurred during regular market hours"
+    },
+    {
+      "name": "metadata",
+      "type": {
+        "type": "map",
+        "values": "string"
+      },
+      "default": {},
+      "doc": "Additional metadata as key-value pairs"
+    }
+  ]
+}

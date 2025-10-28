@@ -1,0 +1,77 @@
+{
+  "type": "record",
+  "name": "DLQMessage",
+  "namespace": "com.trading.finnhub.dlq",
+  "doc": "Dead Letter Queue message for failed processing",
+  "fields": [
+    {
+      "name": "original_topic",
+      "type": "string",
+      "doc": "Original Kafka topic"
+    },
+    {
+      "name": "original_partition",
+      "type": "int",
+      "doc": "Original partition number"
+    },
+    {
+      "name": "original_offset",
+      "type": "long",
+      "doc": "Original message offset"
+    },
+    {
+      "name": "original_key",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Original message key"
+    },
+    {
+      "name": "original_value",
+      "type": "string",
+      "doc": "Original message value (JSON string)"
+    },
+    {
+      "name": "error_message",
+      "type": "string",
+      "doc": "Error description"
+    },
+    {
+      "name": "error_stacktrace",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Full error stacktrace"
+    },
+    {
+      "name": "error_type",
+      "type": {
+        "type": "enum",
+        "name": "ErrorType",
+        "symbols": [
+          "VALIDATION_ERROR",
+          "PARSING_ERROR",
+          "CASSANDRA_WRITE_ERROR",
+          "TRANSFORMATION_ERROR",
+          "UNKNOWN_ERROR"
+        ]
+      },
+      "doc": "Type of error"
+    },
+    {
+      "name": "failed_at",
+      "type": "long",
+      "doc": "Timestamp when processing failed",
+      "logicalType": "timestamp-millis"
+    },
+    {
+      "name": "retry_count",
+      "type": "int",
+      "default": 0,
+      "doc": "Number of retry attempts"
+    },
+    {
+      "name": "processor_id",
+      "type": "string",
+      "doc": "ID of the processor that encountered the error"
+    }
+  ]
+}

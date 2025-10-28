@@ -1,0 +1,79 @@
+{
+  "dashboard": {
+    "title": "Stock Trading Pipeline",
+    "tags": ["trading", "stocks", "realtime"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Messages Received Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(finnhub_messages_received_total[1m])",
+            "legendFormat": "{{symbol}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Kafka Messages Sent",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(kafka_messages_sent_total[1m])",
+            "legendFormat": "{{symbol}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "WebSocket Connection Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "websocket_connected"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 8}
+      },
+      {
+        "id": 4,
+        "title": "Processing Latency (p95)",
+        "type": "gauge",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(message_processing_latency_seconds_bucket[5m]))"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 8}
+      },
+      {
+        "id": 5,
+        "title": "Kafka Consumer Lag",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "kafka_consumergroup_lag"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+      },
+      {
+        "id": 6,
+        "title": "Stock Prices (Real-time)",
+        "type": "timeseries",
+        "targets": [
+          {
+            "datasource": "Cassandra",
+            "rawQuery": true,
+            "query": "SELECT symbol, trade_time, price FROM trading.trades_v2 WHERE trade_time > now() - 1h"
+          }
+        ],
+        "gridPos": {"h": 10, "w": 24, "x": 0, "y": 16}
+      }
+    ]
+  }
+}

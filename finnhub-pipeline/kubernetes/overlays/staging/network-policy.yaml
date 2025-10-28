@@ -1,0 +1,63 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kafka-network-policy
+  namespace: trading-pipeline-staging
+spec:
+  podSelector:
+    matchLabels:
+      app: kafka
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: finnhub-producer
+    - podSelector:
+        matchLabels:
+          app: spark-processor
+    ports:
+    - protocol: TCP
+      port: 9092
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: zookeeper
+    ports:
+    - protocol: TCP
+      port: 2181
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cassandra-network-policy
+  namespace: trading-pipeline-staging
+spec:
+  podSelector:
+    matchLabels:
+      app: cassandra
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: spark-processor
+    - podSelector:
+        matchLabels:
+          app: grafana
+    ports:
+    - protocol: TCP
+      port: 9042
+  - from:
+    - podSelector:
+        matchLabels:
+          app: cassandra
+    ports:
+    - protocol: TCP
+      port: 7000
+    - protocol: TCP
+      port: 7001

@@ -1,0 +1,207 @@
+version: '3.8'
+
+services:
+  # Zookeeper for Kafka
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    hostname: zookeeper
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+      - zookeeper-logs:/var/lib/zookeeper/log
+    networks:
+      - trading-network
+
+  # Kafka broker
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    hostname: kafka
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - trading-network
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  # Cassandra database
+  cassandra:
+    image: cassandra:4.1
+    hostname: cassandra
+    container_name: cassandra
+    ports:
+      - "9042:9042"
+    environment:
+      CASSANDRA_CLUSTER_NAME: 'TradingCluster'
+      CASSANDRA_DC: 'dc1'
+      CASSANDRA_RACK: 'rack1'
+      CASSANDRA_ENDPOINT_SNITCH: 'GossipingPropertyFileSnitch'
+      MAX_HEAP_SIZE: '2G'
+      HEAP_NEWSIZE: '400M'
+    volumes:
+      - cassandra-data:/var/lib/cassandra
+      - ./cassandra/schema:/schema
+    networks:
+      - trading-network
+    healthcheck:
+      test: ["CMD", "cqlsh", "-e", "describe keyspaces"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
+  # Initialize Cassandra schema
+  cassandra-init:
+    image: cassandra:4.1
+    container_name: cassandra-init
+    depends_on:
+      cassandra:
+        condition: service_healthy
+    volumes:
+      - ./cassandra/schema:/schema
+    command: >
+      bash -c "
+        sleep 10 &&
+        cqlsh cassandra -f /schema/keyspace.cql &&
+        cqlsh cassandra -f /schema/trades_v2.cql &&
+        cqlsh cassandra -f /schema/trade_aggregates.cql &&
+        echo 'Schema initialized successfully'
+      "
+    networks:
+      - trading-network
+
+  # Finnhub Producer
+  finnhub-producer:
+    build:
+      context: ./finnhub_producer
+      dockerfile: Dockerfile
+    container_name: finnhub-producer
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      FINNHUB_API_KEY: ${FINNHUB_API_KEY}
+      SYMBOLS: ${SYMBOLS:-AAPL,GOOGL,MSFT,AMZN,TSLA,META,NVDA,NFLX}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC: stock-trades
+      METRICS_PORT: 8000
+      METRICS_ENABLED: 'true'
+    ports:
+      - "8000:8000"
+    networks:
+      - trading-network
+    restart: unless-stopped
+
+  # Spark Processor
+  spark-processor:
+    build:
+      context: ./spark_processor
+      dockerfile: Dockerfile
+    container_name: spark-processor
+    depends_on:
+      kafka:
+        condition: service_healthy
+      cassandra:
+        condition: service_healthy
+    environment:
+      SPARK_MASTER: local[*]
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      CASSANDRA_HOST: cassandra
+      CASSANDRA_PORT: 9042
+    ports:
+      - "4040:4040"
+    volumes:
+      - spark-checkpoint:/tmp/checkpoint
+    networks:
+      - trading-network
+    restart: unless-stopped
+
+  # Prometheus
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus:/etc/prometheus
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    networks:
+      - trading-network
+    restart: unless-stopped
+
+  # Alertmanager
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    container_name: alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./observability/alertmanager:/etc/alertmanager
+      - alertmanager-data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    networks:
+      - trading-network
+    restart: unless-stopped
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:10.2.2
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_INSTALL_PLUGINS: ''
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - grafana-data:/var/lib/grafana
+    networks:
+      - trading-network
+    restart: unless-stopped
+
+volumes:
+  zookeeper-data:
+  zookeeper-logs:
+  kafka-data:
+  cassandra-data:
+  spark-checkpoint:
+  prometheus-data:
+  alertmanager-data:
+  grafana-data:
+
+networks:
+  trading-network:
+    driver: bridge

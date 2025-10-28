@@ -1,0 +1,7 @@
+- job_name: 'spark'
+  static_configs:
+    - targets:
+        - 'spark-processor:4040'
+      labels:
+        service: 'spark'
+        component: 'streaming'

@@ -1,0 +1,126 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: trading-pipeline-staging
+
+namePrefix: staging-
+
+bases:
+- ../../base
+
+resources:
+- namespace.yaml
+- ingress.yaml
+
+# Moderate scaling for staging
+replicas:
+- name: kafka
+  count: 3
+- name: cassandra
+  count: 3
+- name: spark-processor
+  count: 2
+- name: finnhub-producer
+  count: 2
+
+# Staging configuration
+configMapGenerator:
+- name: app-config
+  behavior: merge
+  literals:
+  - ENVIRONMENT=staging
+  - LOG_LEVEL=INFO
+  - SYMBOLS=AAPL,GOOGL,MSFT,AMZN,TSLA
+  - KAFKA_LOG_RETENTION_HOURS=72
+
+# Staging secrets
+secretGenerator:
+- name: finnhub-secrets
+  literals:
+  - FINNHUB_API_KEY=staging_api_key_here
+
+# Staging resources - moderate sizing
+patches:
+- target:
+    kind: StatefulSet
+    name: kafka
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/memory
+      value: "3Gi"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/cpu
+      value: "1"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: "6Gi"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/cpu
+      value: "3"
+    - op: replace
+      path: /spec/volumeClaimTemplates/0/spec/resources/requests/storage
+      value: "50Gi"
+
+- target:
+    kind: StatefulSet
+    name: cassandra
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/memory
+      value: "8Gi"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/cpu
+      value: "3"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: "12Gi"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/cpu
+      value: "6"
+    - op: replace
+      path: /spec/template/spec/containers/0/env
+      value:
+      - name: MAX_HEAP_SIZE
+        value: "6G"
+      - name: HEAP_NEWSIZE
+        value: "1200M"
+      - name: CASSANDRA_CLUSTER_NAME
+        value: "TradingClusterStaging"
+    - op: replace
+      path: /spec/volumeClaimTemplates/0/spec/resources/requests/storage
+      value: "200Gi"
+
+- target:
+    kind: Deployment
+    name: spark-processor
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/memory
+      value: "6Gi"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/cpu
+      value: "2"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: "10Gi"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/cpu
+      value: "4"
+    - op: replace
+      path: /spec/template/spec/containers/0/env
+      value:
+      - name: SPARK_DRIVER_MEMORY
+        value: "3g"
+      - name: SPARK_EXECUTOR_MEMORY
+        value: "6g"
+
+# Add staging labels
+commonLabels:
+  environment: staging
+  team: trading
+  cost-center: staging
+
+commonAnnotations:
+  managed-by: kustomize
+  environment: staging
+  release-channel: beta

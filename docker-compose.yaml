@@ -1,0 +1,192 @@
+version: "3.8"
+
+services:
+
+  # =========== Zookeeper (for Kafka) ===========
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.3.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_logs:/var/lib/zookeeper/log
+
+  # =========== Kafka broker ===========
+  kafka:
+    image: confluentinc/cp-kafka:7.3.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      # JMX metrics exposed by jmx_prometheus_javaagent (see volumes & KAFKA_JAVA_OPTS)
+      - "7071:7071"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      # Attach jmx javaagent via KAFKA_OPTS. The agent is mounted to /opt/jmx/
+      KAFKA_OPTS: "-javaagent:/opt/jmx/jmx_prometheus_javaagent.jar=7071:/opt/jmx/kafka_jmx_config.yml"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+      - ./observability/jmx/jmx_prometheus_javaagent.jar:/opt/jmx/jmx_prometheus_javaagent.jar:ro
+      - ./observability/jmx/kafka_jmx_config.yml:/opt/jmx/kafka_jmx_config.yml:ro
+    restart: unless-stopped
+
+  # =========== Schema Registry (optional if using Avro) ===========
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.3.0
+    container_name: schema-registry
+    depends_on:
+      - kafka
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:9092
+
+  # =========== Cassandra (single node for dev) ===========
+  cassandra:
+    image: cassandra:3.11
+    container_name: cassandra
+    environment:
+      CASSANDRA_CLUSTER_NAME: "DevCluster"
+      CASSANDRA_BROADCAST_ADDRESS: cassandra
+      CASSANDRA_START_RPC: "true"
+    ports:
+      - "9042:9042"
+    volumes:
+      - cassandra_data:/var/lib/cassandra
+    healthcheck:
+      test: ["CMD", "nodetool", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # (Optional) An init service for Cassandra schema / keyspace creation
+  cassandra-init:
+    image: bitnami/cassandra:3.11
+    depends_on:
+      - cassandra
+    entrypoint: ["/bin/sh", "-c", "echo 'Waiting for Cassandra...' && sleep 10 && cqlsh cassandra -f /init/init.cql || true"]
+    volumes:
+      - ./cassandra/init:/init
+
+  # =========== Finnhub Producer (your service) ===========
+  finnhub-producer:
+    build:
+      context: ./finnhub_producer
+      dockerfile: Dockerfile
+    container_name: finnhub-producer
+    depends_on:
+      - kafka
+    environment:
+      METRICS_PORT: 8000
+      # pass any other envs your producer needs, e.g. FINNHUB_API_KEY, KAFKA_BOOTSTRAP_SERVERS, ...
+      # KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+    ports:
+      - "8000:8000"   # metrics endpoint exposed for local access (Prometheus will scrape internal 'finnhub-producer:8000' as well)
+    restart: unless-stopped
+
+  # =========== Spark processor (streaming app) ===========
+  spark-processor:
+    build:
+      context: ./spark_processor
+      dockerfile: Dockerfile
+    container_name: spark-processor
+    depends_on:
+      - kafka
+    environment:
+      # Attach JMX javaagent via JAVA_TOOL_OPTIONS (agent mounted below)
+      JAVA_TOOL_OPTIONS: "-javaagent:/opt/jmx/jmx_prometheus_javaagent.jar=7072:/opt/jmx/spark_jmx_config.yml"
+      # Add any spark env vars you require
+    volumes:
+      - ./observability/jmx/jmx_prometheus_javaagent.jar:/opt/jmx/jmx_prometheus_javaagent.jar:ro
+      - ./observability/jmx/spark_jmx_config.yml:/opt/jmx/spark_jmx_config.yml:ro
+    ports:
+      - "7072:7072"
+    restart: unless-stopped
+
+  # =========== Prometheus ===========
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/prometheus/rules.yml:/etc/prometheus/rules.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    depends_on:
+      - finnhub-producer
+      - kafka
+      - spark-processor
+      - cassandra
+    restart: unless-stopped
+
+  # =========== Alertmanager ===========
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./observability/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    restart: unless-stopped
+
+  # =========== Grafana ===========
+  grafana:
+    image: grafana/grafana:9.5.2
+    container_name: grafana
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: "${GF_SECURITY_ADMIN_PASSWORD:-admin}"
+      GF_INSTALL_PLUGINS: "grafana-piechart-panel"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    restart: unless-stopped
+
+  # =========== Node exporter (host metrics) ===========
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    ports:
+      - "9100:9100"
+    command:
+      - '--path.rootfs=/host'
+    volumes:
+      - /:/host:ro,rslave
+    restart: unless-stopped
+
+  # =========== Cassandra exporter (example) ===========
+  cassandra-exporter:
+    image: instaclustr/cassandra-exporter:latest
+    container_name: cassandra-exporter
+    depends_on:
+      - cassandra
+    environment:
+      CASSANDRA_HOSTS: "cassandra:9042"
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+volumes:
+  zookeeper_data:
+  zookeeper_logs:
+  kafka_data:
+  cassandra_data:
+  prometheus_data:
+  grafana_data:

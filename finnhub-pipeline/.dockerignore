@@ -1,0 +1,48 @@
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+.Python
+**/.pytest_cache
+**/.coverage
+**/htmlcov
+**/*.log
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Documentation
+*.md
+docs/
+images/
+
+# Tests
+tests/
+**/*_test.py
+
+# CI/CD
+.github/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Data
+data/
+*.parquet
+*.csv
+checkpoint/

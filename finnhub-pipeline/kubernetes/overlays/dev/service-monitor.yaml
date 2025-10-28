@@ -1,0 +1,15 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: trading-pipeline-dev
+  namespace: trading-pipeline-dev
+  labels:
+    environment: development
+spec:
+  selector:
+    matchLabels:
+      environment: development
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics

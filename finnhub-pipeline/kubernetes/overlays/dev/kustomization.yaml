@@ -1,0 +1,124 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: trading-pipeline-dev
+
+namePrefix: dev-
+
+bases:
+- ../../base
+
+resources:
+- namespace.yaml
+
+# Scale down for dev environment
+replicas:
+- name: kafka
+  count: 1
+- name: cassandra
+  count: 1
+- name: spark-processor
+  count: 1
+- name: finnhub-producer
+  count: 1
+
+# Development configuration
+configMapGenerator:
+- name: app-config
+  behavior: merge
+  literals:
+  - ENVIRONMENT=development
+  - LOG_LEVEL=DEBUG
+  - SYMBOLS=AAPL,GOOGL
+  - KAFKA_LOG_RETENTION_HOURS=24
+
+# Development secrets
+secretGenerator:
+- name: finnhub-secrets
+  literals:
+  - FINNHUB_API_KEY=dev_api_key_here
+
+# Reduce resources for dev
+patches:
+- target:
+    kind: StatefulSet
+    name: kafka
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/memory
+      value: "1Gi"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/cpu
+      value: "500m"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: "2Gi"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/cpu
+      value: "1"
+
+- target:
+    kind: StatefulSet
+    name: cassandra
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/memory
+      value: "2Gi"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/cpu
+      value: "1"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: "4Gi"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/cpu
+      value: "2"
+    - op: replace
+      path: /spec/template/spec/containers/0/env
+      value:
+      - name: MAX_HEAP_SIZE
+        value: "2G"
+      - name: HEAP_NEWSIZE
+        value: "400M"
+
+- target:
+    kind: Deployment
+    name: spark-processor
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/memory
+      value: "2Gi"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/cpu
+      value: "1"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: "4Gi"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/cpu
+      value: "2"
+    - op: replace
+      path: /spec/template/spec/containers/0/env
+      value:
+      - name: SPARK_DRIVER_MEMORY
+        value: "1g"
+      - name: SPARK_EXECUTOR_MEMORY
+        value: "2g"
+
+# Development storage - smaller volumes
+- target:
+    kind: PersistentVolumeClaim
+  patch: |-
+    - op: replace
+      path: /spec/resources/requests/storage
+      value: "10Gi"
+
+# Add development labels
+commonLabels:
+  environment: development
+  team: trading
+  cost-center: dev
+
+commonAnnotations:
+  managed-by: kustomize
+  environment: development

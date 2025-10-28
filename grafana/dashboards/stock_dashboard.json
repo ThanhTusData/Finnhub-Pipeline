@@ -1,0 +1,48 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Real-time Stock Market Dashboard",
+    "tags": ["stocks", "real-time"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Latest Prices",
+        "type": "stat",
+        "targets": [
+          {
+            "rawQuery": true,
+            "query": "SELECT symbol, price, timestamp FROM trades WHERE symbol IN ('AAPL', 'GOOGL', 'MSFT') ORDER BY timestamp DESC LIMIT 3"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Price Trends",
+        "type": "timeseries",
+        "targets": [
+          {
+            "rawQuery": true,
+            "query": "SELECT window_start, avg_price, symbol FROM trade_aggregates WHERE symbol IN ('AAPL', 'GOOGL', 'MSFT') ORDER BY window_start DESC LIMIT 100"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Volume Analysis",
+        "type": "barchart",
+        "targets": [
+          {
+            "rawQuery": true,
+            "query": "SELECT symbol, total_volume FROM trade_aggregates WHERE window_start > now() - interval '1 hour' ORDER BY total_volume DESC LIMIT 10"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8}
+      }
+    ],
+    "time": {"from": "now-1h", "to": "now"},
+    "refresh": "5s"
+  }
+}

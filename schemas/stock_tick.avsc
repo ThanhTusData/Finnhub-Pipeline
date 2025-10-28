@@ -1,0 +1,13 @@
+{
+  "type": "record",
+  "name": "StockTick",
+  "namespace": "market",
+  "fields": [
+    {"name": "symbol", "type": "string"},
+    {"name": "price", "type": "double"},
+    {"name": "volume", "type": "double"},
+    {"name": "timestamp", "type": "long"},
+    {"name": "conditions", "type": {"type": "array", "items": "string"}},
+    {"name": "processed_at", "type": "long"}
+  ]
+}

@@ -1,0 +1,67 @@
+# Production Override for Docker Compose
+
+version: '3.8'
+
+services:
+  finnhub-producer:
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+    restart: always
+
+  kafka:
+    environment:
+      KAFKA_HEAP_OPTS: -Xmx4G -Xms4G
+      KAFKA_LOG_RETENTION_HOURS: 168
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+    volumes:
+      - kafka-data:/var/lib/kafka/data:rw
+
+  cassandra:
+    environment:
+      MAX_HEAP_SIZE: 8G
+      HEAP_NEWSIZE: 1600M
+    deploy:
+      resources:
+        limits:
+          cpus: '8'
+          memory: 16G
+    volumes:
+      - cassandra-data:/var/lib/cassandra:rw
+
+  spark-processor:
+    environment:
+      SPARK_DRIVER_MEMORY: 4g
+      SPARK_EXECUTOR_MEMORY: 8g
+      SPARK_EXECUTOR_CORES: 4
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '8'
+          memory: 16G
+
+  prometheus:
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=90d'
+    volumes:
+      - prometheus-data:/prometheus:rw
+
+volumes:
+  kafka-data:
+    driver: local
+  cassandra-data:
+    driver: local
+  prometheus-data:
+    driver: local

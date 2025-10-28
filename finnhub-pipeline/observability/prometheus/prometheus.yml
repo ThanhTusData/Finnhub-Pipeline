@@ -1,0 +1,53 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'finnhub-pipeline'
+    environment: 'production'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+# Load rules
+rule_files:
+  - 'rules.yml'
+
+# Scrape configurations
+scrape_configs:
+  # Finnhub Producer metrics
+  - job_name: 'finnhub-producer'
+    static_configs:
+      - targets:
+          - finnhub-producer:8000
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'producer'
+
+  # Kafka metrics
+  - job_name: 'kafka'
+    static_configs:
+      - targets:
+          - kafka:9090
+
+  # Spark metrics
+  - job_name: 'spark'
+    static_configs:
+      - targets:
+          - spark:4040
+
+  # Cassandra metrics
+  - job_name: 'cassandra'
+    static_configs:
+      - targets:
+          - cassandra-exporter:9500
+
+  # Node exporter
+  - job_name: 'node'
+    static_configs:
+      - targets:
+          - node-exporter:9100

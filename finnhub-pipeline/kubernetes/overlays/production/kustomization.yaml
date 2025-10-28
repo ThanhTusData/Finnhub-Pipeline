@@ -1,0 +1,54 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: trading-pipeline
+
+bases:
+- ../../base
+
+resources:
+- ingress.yaml
+
+replicas:
+- name: kafka
+  count: 5
+- name: cassandra
+  count: 5
+- name: spark-processor
+  count: 3
+- name: finnhub-producer
+  count: 3
+
+patches:
+- target:
+    kind: StatefulSet
+    name: kafka
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: "16Gi"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/cpu
+      value: "8"
+
+- target:
+    kind: StatefulSet
+    name: cassandra
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: "32Gi"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/cpu
+      value: "16"
+
+configMapGenerator:
+- name: app-config
+  literals:
+  - ENVIRONMENT=production
+  - LOG_LEVEL=INFO
+
+secretGenerator:
+- name: finnhub-secrets
+  literals:
+  - FINNHUB_API_KEY=your_production_api_key_here

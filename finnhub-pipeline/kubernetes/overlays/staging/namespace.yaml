@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: trading-pipeline-staging
+  labels:
+    name: trading-pipeline-staging
+    environment: staging
+    app: finnhub-pipeline
+  annotations:
+    description: "Staging environment for trading pipeline"
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: staging-quota
+  namespace: trading-pipeline-staging
+spec:
+  hard:
+    requests.cpu: "30"
+    requests.memory: 60Gi
+    limits.cpu: "60"
+    limits.memory: 120Gi
+    persistentvolumeclaims: "30"
+    services.loadbalancers: "2"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: staging-limits
+  namespace: trading-pipeline-staging
+spec:
+  limits:
+  - max:
+      cpu: "6"
+      memory: 12Gi
+    min:
+      cpu: "100m"
+      memory: 128Mi
+    default:
+      cpu: "1"
+      memory: 1Gi
+    defaultRequest:
+      cpu: "500m"
+      memory: 512Mi
+    type: Container

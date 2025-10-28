@@ -1,0 +1,44 @@
+{
+  "type": "record",
+  "name": "MarketValue",
+  "namespace": "com.trading.finnhub",
+  "doc": "Stock market trade data from Finnhub API (v1)",
+  "fields": [
+    {
+      "name": "symbol",
+      "type": "string",
+      "doc": "Stock symbol (e.g., AAPL, GOOGL)"
+    },
+    {
+      "name": "price",
+      "type": "double",
+      "doc": "Trade price in USD"
+    },
+    {
+      "name": "timestamp",
+      "type": "long",
+      "doc": "Trade timestamp in milliseconds since epoch",
+      "logicalType": "timestamp-millis"
+    },
+    {
+      "name": "volume",
+      "type": "double",
+      "doc": "Trade volume (number of shares)"
+    },
+    {
+      "name": "conditions",
+      "type": {
+        "type": "array",
+        "items": "string"
+      },
+      "default": [],
+      "doc": "Trade condition codes"
+    },
+    {
+      "name": "processed_at",
+      "type": "long",
+      "doc": "Processing timestamp in milliseconds",
+      "logicalType": "timestamp-millis"
+    }
+  ]
+}

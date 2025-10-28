@@ -1,0 +1,8 @@
+- job_name: 'finnhub-producer'
+  scrape_interval: 10s
+  static_configs:
+    - targets:
+        - 'finnhub-producer:8000'
+      labels:
+        service: 'producer'
+        component: 'ingestion'

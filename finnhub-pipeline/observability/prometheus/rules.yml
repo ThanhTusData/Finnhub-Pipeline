@@ -1,0 +1,69 @@
+groups:
+  - name: finnhub_pipeline_alerts
+    interval: 30s
+    rules:
+      # Producer alerts
+      - alert: ProducerDown
+        expr: up{job="finnhub-producer"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Finnhub producer is down"
+          description: "Producer has been down for more than 1 minute"
+
+      - alert: WebSocketDisconnected
+        expr: websocket_connected == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "WebSocket connection lost"
+          description: "WebSocket has been disconnected for {{ $value }} seconds"
+
+      - alert: HighValidationErrorRate
+        expr: rate(validation_errors_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High validation error rate"
+          description: "Validation errors: {{ $value | humanize }}/s"
+
+      - alert: KafkaWriteFailures
+        expr: rate(kafka_messages_failed_total[5m]) > 5
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High Kafka write failure rate"
+          description: "Failed messages: {{ $value | humanize }}/s"
+
+      # Kafka alerts
+      - alert: KafkaConsumerLag
+        expr: kafka_consumergroup_lag > 10000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Kafka consumer lag"
+          description: "Consumer lag is {{ $value }} messages"
+
+      # Cassandra alerts
+      - alert: CassandraDown
+        expr: up{job="cassandra"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Cassandra is down"
+          description: "Cassandra has been down for more than 1 minute"
+
+      - alert: HighCassandraWriteLatency
+        expr: cassandra_table_write_latency_seconds{quantile="0.99"} > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Cassandra write latency"
+          description: "P99 write latency: {{ $value | humanize }}s"
